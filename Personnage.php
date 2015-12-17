@@ -1,96 +1,111 @@
 <?php
-class PersonnagesManager
+class Personnage
 {
-  private $_db; // Instance de PDO
+  private $_degats,
+          $_id,
+          $_nom;
   
-  public function __construct($db)
+  const CEST_MOI = 1; // Constante renvoyée par la méthode `frapper` si on se frappe soi-même.
+  const PERSONNAGE_TUE = 2; // Constante renvoyée par la méthode `frapper` si on a tué le personnage en le frappant.
+  const PERSONNAGE_FRAPPE = 3; // Constante renvoyée par la méthode `frapper` si on a bien frappé le personnage.
+  
+  //fout la merde
+  public function construire(array $donnees)
   {
-    $this->setDb($db);
+    $this->hydrate($donnees);
+  }
+
+  public function parler(){
+    echo 'va te faire foutre';
   }
   
-  public function add(Personnage $perso)
+  public function frapper(Personnage $perso)
   {
-    $q = $this->_db->prepare('INSERT INTO personnages SET nom = :nom');
-    $q->bindValue(':nom', $perso->nom());
-    $q->execute();
-    
-    $perso->hydrate([
-      'id' => $this->_db->lastInsertId(),
-      'degats' => 0,
-    ]);
-  }
-  
-  public function count()
-  {
-    return $this->_db->query('SELECT COUNT(*) FROM personnages')->fetchColumn();
-  }
-  
-  public function delete(Personnage $perso)
-  {
-    $this->_db->exec('DELETE FROM personnages WHERE id = '.$perso->id());
-  }
-  
-  public function exists($info)
-  {
-    if (is_int($info)) // On veut voir si tel personnage ayant pour id $info existe.
+    if ($perso->id() == $this->_id)
     {
-      return (bool) $this->_db->query('SELECT COUNT(*) FROM personnages WHERE id = '.$info)->fetchColumn();
+      return self::CEST_MOI;
     }
     
-    // Sinon, c'est qu'on veut vérifier que le nom existe ou pas.
-    
-    $q = $this->_db->prepare('SELECT COUNT(*) FROM personnages WHERE nom = :nom');
-    $q->execute([':nom' => $info]);
-    
-    return (bool) $q->fetchColumn();
+    // On indique au personnage qu'il doit recevoir des dégâts.
+    // Puis on retourne la valeur renvoyée par la méthode : self::PERSONNAGE_TUE ou self::PERSONNAGE_FRAPPE
+    return $perso->recevoirDegats();
   }
   
-  public function get($info)
+  public function hydrate(array $donnees)
   {
-    if (is_int($info))
+    foreach ($donnees as $key => $value)
     {
-      $q = $this->_db->query('SELECT id, nom, degats FROM personnages WHERE id = '.$info);
-      $donnees = $q->fetch(PDO::FETCH_ASSOC);
+      $method = 'set'.ucfirst($key);
       
-      return new Personnage($donnees);
+      if (method_exists($this, $method))
+      {
+        $this->$method($value);
+      }
     }
-    else
+  }
+  
+  public function recevoirDegats()
+  {
+    $this->_degats += 5;
+    
+    // Si on a 100 de dégâts ou plus, on dit que le personnage a été tué.
+    if ($this->_degats >= 100)
     {
-      $q = $this->_db->prepare('SELECT id, nom, degats FROM personnages WHERE nom = :nom');
-      $q->execute([':nom' => $info]);
-    
-      return new Personnage($q->fetch(PDO::FETCH_ASSOC));
+      return self::PERSONNAGE_TUE;
     }
+    
+    // Sinon, on se contente de dire que le personnage a bien été frappé.
+    return self::PERSONNAGE_FRAPPE;
   }
   
-  public function getList($nom)
+  
+  // GETTERS //
+  
+
+  public function degats()
   {
-    $persos = [];
+    return $this->_degats;
+  }
+  
+  public function id()
+  {
+    return $this->_id;
+  }
+  
+  public function nom()
+  {
+    return $this->_nom;
+  }
+  
+  public function setDegats($degats)
+  {
+    $degats = (int) $degats;
     
-    $q = $this->_db->prepare('SELECT id, nom, degats FROM personnages WHERE nom <> :nom ORDER BY nom');
-    $q->execute([':nom' => $nom]);
-    
-    while ($donnees = $q->fetch(PDO::FETCH_ASSOC))
+    if ($degats >= 0 && $degats <= 100)
     {
-      $persos[] = new Personnage($donnees);
+      $this->_degats = $degats;
     }
-    
-    return $persos;
   }
   
-  public function update(Personnage $perso)
+  public function setId($id)
   {
-    $q = $this->_db->prepare('UPDATE personnages SET degats = :degats WHERE id = :id');
+    $id = (int) $id;
     
-    $q->bindValue(':degats', $perso->degats(), PDO::PARAM_INT);
-    $q->bindValue(':id', $perso->id(), PDO::PARAM_INT);
-    
-    $q->execute();
+    if ($id > 0)
+    {
+      $this->_id = $id;
+    }
   }
   
-  public function setDb(PDO $db)
+  public function setNom($nom)
   {
-    $this->_db = $db;
+    if (is_string($nom))
+    {
+      $this->_nom = $nom;
+    }
   }
 }
+$perso = new Personnage();
+$perso->parler();
+
 ?>
